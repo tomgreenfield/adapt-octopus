@@ -1,5 +1,13 @@
 #!/usr/bin/env node
 
-const octopus = require("../index.js");
+const Octopus = require("../index.js");
 
-octopus.read();
+const octopus = new Octopus(process.argv[2], process.argv[3]);
+
+(async function() {
+	try {
+		await octopus.start();
+	} catch (err) {
+		console.warn(err)
+	}
+})();

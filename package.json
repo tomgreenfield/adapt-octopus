@@ -11,5 +11,8 @@
   "bugs": {
     "url": "https://github.com/tomgreenfield/adapt-octopus/issues"
   },
-  "homepage": "https://github.com/tomgreenfield/adapt-octopus#readme"
+  "homepage": "https://github.com/tomgreenfield/adapt-octopus#readme",
+  "dependencies": {
+    "fs-extra": "^8.1.0"
+  }
 }
