@@ -3,6 +3,7 @@ const os = require("os");
 
 let inputSchema;
 let outputSchema;
+let isObjectId;
 
 function read() {
 	const inputPath = process.argv[2];
@@ -19,7 +20,7 @@ function read() {
 
 function convert() {
 	outputSchema = {
-	  $id: "https://www.adaptlearning.org",
+	  // $id: "https://www.adaptlearning.org",
 	  $schema: "http://json-schema.org/draft-07/schema#",
 	  type: "object",
 	  required: getRequiredFields(inputSchema),
@@ -76,7 +77,7 @@ function getProperties(schema) {
 
 function getSchema(key, value) {
 	return {
-		type: value.type,
+		type: getType(value),
 		title: getTitle(value, key),
 		description: value.help,
 		default: getDefault(value),
@@ -84,10 +85,19 @@ function getSchema(key, value) {
 		required: getRequiredFields(value),
 		items: getItems(value),
 		properties: getProperties(value),
+		isObjectId: isObjectId,
 		_adapt: getAdaptOptions(value),
 		_backboneForms: getBackboneFormsOptions(value),
 		_unrecognisedFields: getUnrecognisedFields(value)
 	};
+}
+
+function getType(schema) {
+	if (schema.type !== "objectid") return schema.type;
+
+	isObjectId = true;
+
+	return "string";
 }
 
 function getTitle(schema, key) {
@@ -101,16 +111,22 @@ function getTitle(schema, key) {
 }
 
 function getDefault(schema) {
-	if (schema.default !== undefined) return schema.default;
+	const hasDefault = schema.default !== undefined;
+
+	if (hasDefault) return schema.default;
+
+	const isRequired = schema.validators && schema.validators.includes("required");
+
+	if (!hasDefault && isRequired) return;
 
 	switch (schema.type) {
 		case "string":
+		case "objectid":
 			return "";
 		case "number":
 			return 0;
 		case "object":
-			if (!schema.properties) return {};
-			break;
+			return {};
 		case "array":
 			if (!schema.items) return [];
 			break;
@@ -169,9 +185,18 @@ function getAdaptOptions(schema) {
 }
 
 function getBackboneFormsOptions(schema) {
-	const getType = () => {
+	const getEditor = () => {
 		const type = schema.type;
-		const recognisedTypes = [ "string", "number", "object", "array", "boolean" ];
+
+		const recognisedTypes = [
+			"string",
+			"number",
+			"object",
+			"array",
+			"boolean",
+			"objectid"
+		];
+
 		const editor = options.type || schema.inputType;
 
 		if (!recognisedTypes.includes(type)) console.log(`Unrecognised type => ${type}`);
@@ -200,7 +225,7 @@ function getBackboneFormsOptions(schema) {
 	let options = typeof schema.inputType === "object" ? schema.inputType : {};
 
 	Object.assign(options, {
-		type: getType(),
+		type: getEditor(),
 		titleHTML: schema.titleHTML,
 		validators: getValidators(),
 		editorClass: schema.editorClass,
