@@ -1,12 +1,14 @@
 const fs = require("fs");
 const os = require("os");
+const path = require("path");
 
+let inputPath;
 let inputSchema;
 let outputSchema;
 let isObjectId;
 
 function read() {
-	const inputPath = process.argv[2];
+	inputPath = process.argv[2];
 
 	if (!inputPath) throw(new Error("No input path specified."));
 
@@ -20,8 +22,8 @@ function read() {
 
 function convert() {
 	outputSchema = {
-	  // $id: "https://www.adaptlearning.org",
-	  $schema: "http://json-schema.org/draft-07/schema#",
+	  $id: getId(),
+	  $schema: "http://json-schema.org/draft/2019-09/schema#",
 	  type: "object",
 	  required: getRequiredFields(inputSchema),
 	  properties: getProperties(inputSchema)
@@ -36,7 +38,7 @@ function write() {
 	fs.writeFile(outputPath, JSON.stringify(outputSchema, null, 2) + os.EOL, error => {
 		if (error) throw error;
 
-		console.log("Written schema.");
+		console.log(`Written to ${outputPath}.`);
 	});
 }
 
@@ -46,6 +48,17 @@ function stripObject(object) {
 	if (!Object.keys(object).length) return;
 
 	return object;
+}
+
+function getId() {
+	const id = path.basename(inputPath, ".model.schema");
+
+	if (id === "properties.schema") {
+		console.log("Please type an $id manually.");
+		return "";
+	}
+
+	return id;
 }
 
 function getProperties(schema) {
