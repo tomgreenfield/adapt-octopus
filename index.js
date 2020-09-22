@@ -5,7 +5,6 @@ const path = require("path");
 let inputPath;
 let inputSchema;
 let outputSchema;
-let isObjectId;
 
 function read() {
 	inputPath = process.argv[2];
@@ -26,7 +25,8 @@ function convert() {
 	  $schema: "http://json-schema.org/draft/2019-09/schema#",
 	  type: "object",
 	  required: getRequiredFields(inputSchema),
-	  properties: getProperties(inputSchema)
+	  properties: getProperties(inputSchema),
+	  additionalProperties: false
 	};
 
 	write();
@@ -98,7 +98,7 @@ function getSchema(key, value) {
 		required: getRequiredFields(value),
 		items: getItems(value),
 		properties: getProperties(value),
-		isObjectId: isObjectId,
+		isObjectId: getIsObjectId(value),
 		_adapt: getAdaptOptions(value),
 		_backboneForms: getBackboneFormsOptions(value),
 		_unrecognisedFields: getUnrecognisedFields(value)
@@ -106,11 +106,9 @@ function getSchema(key, value) {
 }
 
 function getType(schema) {
-	if (schema.type !== "objectid") return schema.type;
+	const type = schema.type;
 
-	isObjectId = true;
-
-	return "string";
+	return type === "objectid" ? "string" : type;
 }
 
 function getTitle(schema, key) {
@@ -181,12 +179,15 @@ function getItems(schema) {
 
 	if (!items) return;
 
-	if (!items.properties) {
-		console.log(`Removing unrecognised items: ${JSON.stringify(items)}`);
-		return;
-	}
+	return items.properties ?
+		{ type: "object", properties: getProperties(items) } :
+		{ type: getType(items), isObjectId: getIsObjectId(items) };
+}
 
-	return { type: "object", properties: getProperties(items) };
+function getIsObjectId(schema) {
+	if (schema.type !== "objectid") return;
+
+	return true;
 }
 
 function getAdaptOptions(schema) {
