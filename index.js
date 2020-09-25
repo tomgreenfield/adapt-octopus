@@ -2,14 +2,14 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-let inputPath;
+const inputPath = process.argv[2];
+const inputId = process.argv[3];
 let inputSchema;
 let outputSchema;
 
 function read() {
-	inputPath = process.argv[2];
-
-	if (!inputPath) throw(new Error("No input path specified."));
+	if (!inputPath) throw(new Error("No input path specified"));
+	if (!inputId) throw(new Error("No ID specified"));
 
 	fs.readFile(inputPath, "utf8", (error, data) => {
 		if (error) throw error;
@@ -20,25 +20,64 @@ function read() {
 }
 
 function convert() {
-	outputSchema = {
-	  $id: getId(),
-	  $schema: "http://json-schema.org/draft/2019-09/schema#",
-	  type: "object",
-	  required: getRequiredFields(inputSchema),
-	  properties: getProperties(inputSchema),
-	  additionalProperties: false
-	};
+	const properties = inputSchema.properties;
 
-	write();
+	switch (inputSchema.$ref) {
+		case "http://localhost/plugins/content/component/model.schema":
+			construct("course", {});
+			construct("component");
+			return;
+		case "http://localhost/plugins/content/theme/model.schema":
+			// construct("theme", { properties: properties.variables });
+		default:
+			if (properties && properties.pluginLocations) return iterateLocations();
+
+			construct(path.basename(inputPath, ".model.schema"));
+	}
 }
 
-function write() {
-	const outputPath = process.argv[3] || "schema.json";
+function iterateLocations() {
+	const locations = inputSchema.properties.pluginLocations.properties;
 
+	Object.entries(locations).forEach(([ key, value ]) => construct(key, value));
+
+	// ensure any globals are converted
+	if (!Object.keys(locations).includes("course")) construct("course", {});
+}
+
+function construct(type, schema = inputSchema) {
+	const properties = schema.properties;
+
+	switch (type) {
+		case "course":
+			if (schema.globals || (schema.globals = inputSchema.globals)) break;
+		default:
+			if (!properties || !Object.keys(properties).length) return;
+	}
+
+	const isCore = type === inputId;
+
+	outputSchema = {
+		$id: isCore ? type : `${inputId}-${type}`,
+		$schema: "http://json-schema.org/draft/2019-09/schema#",
+		type: "object",
+		$merge: {
+			source: { $ref: isCore ? "content" : type },
+			with: {
+				required: getRequiredFields(schema),
+				properties: getProperties(schema)
+			}
+		}
+	};
+  
+	write(`${type}.schema.json`);
+}
+
+function write(outputPath) {
 	fs.writeFile(outputPath, JSON.stringify(outputSchema, null, 2) + os.EOL, error => {
 		if (error) throw error;
 
-		console.log(`Written to ${outputPath}.`);
+		console.log(`Written to ${outputPath}`);
 	});
 }
 
@@ -50,33 +89,29 @@ function stripObject(object) {
 	return object;
 }
 
-function getId() {
-	const id = path.basename(inputPath, ".model.schema");
-
-	if (id === "properties.schema") {
-		console.log("Please type an $id manually.");
-		return "";
-	}
-
-	return id;
-}
-
 function getProperties(schema) {
 	const originalProperties = schema.properties;
-	const globals = schema.globals;
+	const originalGlobals = schema.globals;
 
-	if (!originalProperties && !globals) return;
+	if (!originalProperties && !originalGlobals) return;
 
+	let globals = {};
 	let properties = {};
 
-	if (globals) {
-		properties.globals = {};
-
-		for (const key in globals) {
-			if (globals.hasOwnProperty(key)) {
-				properties.globals[key] = getSchema(key, globals[key]);
+	if (originalGlobals) {
+		for (const key in originalGlobals) {
+			if (originalGlobals.hasOwnProperty(key)) {
+				globals[key] = getSchema(key, originalGlobals[key]);
 			}
 		}
+
+		properties._globals = {
+			type: "object",
+			default: {},
+			properties: {
+				[`_${inputId}`]: { type: "object", default: {}, properties: globals }
+			}
+		};
 	}
 
 	for (const key in originalProperties) {
