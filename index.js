@@ -286,6 +286,16 @@ function getBackboneFormsOptions(schema) {
 		confirmDelete: schema.confirmDelete
 	});
 
+	let splitTypes = options.type && options.type.split(":");
+
+	switch (splitTypes && splitTypes.length > 1 && splitTypes[0]) {
+		case "Asset":
+			options.type = { type: "Asset", media: splitTypes[1] };
+			break;
+		case "CodeEditor":
+			options.type = { type: "CodeEditor", mode: splitTypes[1] };
+	}
+
 	if (options.type === "Select") delete options.options;
 
 	options = stripObject(options);
