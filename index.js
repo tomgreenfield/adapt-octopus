@@ -53,6 +53,8 @@ function construct(type, schema = inputSchema) {
 			if (schema.globals || (schema.globals = inputSchema.globals)) break;
 		default:
 			if (!properties || !Object.keys(properties).length) return;
+
+			delete schema.globals;
 	}
 
 	const isCore = type === inputId;
