@@ -60,7 +60,7 @@ function construct(type, schema = inputSchema) {
 	const isCore = type === inputId;
 
 	outputSchema = {
-		$id: isCore ? type : `${inputId}-${type}`,
+		$anchor: isCore ? type : `${inputId}-${type}`,
 		$schema: "http://json-schema.org/draft/2019-09/schema#",
 		type: "object",
 		$merge: {
