@@ -128,6 +128,7 @@ function getProperties(schema) {
 function getSchema(key, value) {
 	return {
 		type: getType(value),
+		isObjectId: getIsObjectId(value),
 		title: getTitle(value, key),
 		description: value.help,
 		default: getDefault(value),
@@ -135,7 +136,6 @@ function getSchema(key, value) {
 		required: getRequiredFields(value),
 		items: getItems(value),
 		properties: getProperties(value),
-		isObjectId: getIsObjectId(value),
 		_adapt: getAdaptOptions(value),
 		_backboneForms: getBackboneFormsOptions(value),
 		_unrecognisedFields: getUnrecognisedFields(value)
@@ -252,7 +252,8 @@ function getBackboneFormsOptions(schema) {
 
 		if (!recognisedTypes.includes(type)) console.log(`Unrecognised type => ${type}`);
 
-		if (type === "string" && editor === "Text" ||
+		if (editor === "QuestionButton" ||
+			type === "string" && editor === "Text" ||
 			type === "number" && editor === "Number" ||
 			type === "boolean" && editor === "Checkbox") {
 			return;
@@ -266,7 +267,10 @@ function getBackboneFormsOptions(schema) {
 
 		if (!validators) return;
 
-		validators = schema.validators.filter(validator => validator !== "required");
+		validators = schema.validators.filter(validator => {
+			return validator === "number" ? schema.inputType !== "Number" :
+				validator !== "required";
+		});
 
 		if (!validators.length) return;
 
