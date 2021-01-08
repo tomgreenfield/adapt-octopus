@@ -61,7 +61,7 @@ function construct(type, schema = inputSchema) {
 
 	outputSchema = {
 		$anchor: isCore ? type : `${inputId}-${type}`,
-		$schema: "http://json-schema.org/draft/2019-09/schema#",
+		$schema: "https://json-schema.org/draft/2019-09/schema",
 		type: "object",
 		$merge: {
 			source: { $ref: isCore ? "content" : type },
@@ -169,7 +169,6 @@ function getDefault(schema) {
 
 	switch (schema.type) {
 		case "string":
-		case "objectid":
 			return "";
 		case "number":
 			return 0;
