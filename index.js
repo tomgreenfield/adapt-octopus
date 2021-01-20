@@ -77,7 +77,7 @@ function construct(type, schema = inputSchema) {
 
 function write(outputPath) {
 	try {
-		fs.mkdirSync(path.dirname(outputPath));
+		fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 		fs.writeFileSync(outputPath, JSON.stringify(outputSchema, null, 2) + os.EOL);
 		console.log(`Written to ${outputPath}`);
 	} catch (error) {
