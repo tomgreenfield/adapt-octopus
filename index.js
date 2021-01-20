@@ -8,15 +8,15 @@ let inputSchema;
 let outputSchema;
 
 function read() {
-	if (!inputPath) throw(new Error("No input path specified"));
-	if (!inputId) throw(new Error("No ID specified"));
+	try {
+		if (!inputPath) throw(new Error("No input path specified"));
+		if (!inputId) throw(new Error("No ID specified"));
 
-	fs.readFile(inputPath, "utf8", (error, data) => {
-		if (error) throw error;
-
-		inputSchema = JSON.parse(data);
+		inputSchema = JSON.parse(fs.readFileSync(inputPath, "utf8"));
 		convert();
-	});
+	} catch (error) {
+		console.error(error);
+	}
 }
 
 function convert() {
@@ -72,15 +72,17 @@ function construct(type, schema = inputSchema) {
 		}
 	};
   
-	write(`${type}.schema.json`);
+	write(`schema/${type}.schema.json`);
 }
 
 function write(outputPath) {
-	fs.writeFile(outputPath, JSON.stringify(outputSchema, null, 2) + os.EOL, error => {
-		if (error) throw error;
-
+	try {
+		fs.mkdirSync(path.dirname(outputPath));
+		fs.writeFileSync(outputPath, JSON.stringify(outputSchema, null, 2) + os.EOL);
 		console.log(`Written to ${outputPath}`);
-	});
+	} catch (error) {
+		console.error(error);
+	}
 }
 
 function stripObject(object) {
