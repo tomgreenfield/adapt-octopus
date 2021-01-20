@@ -9,7 +9,7 @@ Note: requires [Node.js](http://nodejs.org) to be installed.
 From the command line, run:
 
 ```console
-npm install -g github:tomgreenfield/adapt-octopus
+npm install -g tomgreenfield/adapt-octopus
 ```
 
 ## Usage
