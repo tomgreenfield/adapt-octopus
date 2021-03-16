@@ -28,7 +28,7 @@ function convert() {
 			construct("component");
 			return;
 		case "http://localhost/plugins/content/theme/model.schema":
-			// construct("theme", { properties: properties.variables });
+			construct("theme", { properties: properties.variables });
 		default:
 			if (properties && properties.pluginLocations) return iterateLocations();
 
@@ -132,7 +132,7 @@ function getSchema(key, value) {
 		type: getType(value),
 		isObjectId: getIsObjectId(value),
 		title: getTitle(value, key),
-		description: value.help,
+		description: getDescription(value),
 		default: getDefault(value),
 		enum: getEnumeratedValues(value),
 		required: getRequiredFields(value),
@@ -158,6 +158,10 @@ function getTitle(schema, key) {
 	key = key.replace(/_/g, "").replace(/[A-Z]/g, " $&").toLowerCase();
 
 	return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+function getDescription(schema) {
+	if (schema.help) return schema.help;
 }
 
 function getDefault(schema) {
