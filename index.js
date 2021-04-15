@@ -165,6 +165,8 @@ function getDescription(schema) {
 }
 
 function getDefault(schema) {
+	if (getIsObjectId(schema)) return;
+
 	const hasDefault = schema.default !== undefined;
 
 	if (hasDefault) return schema.default;
