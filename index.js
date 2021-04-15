@@ -63,7 +63,7 @@ function construct(type, schema = inputSchema) {
 		$anchor: isCore ? type : `${inputId}-${type}`,
 		$schema: "https://json-schema.org/draft/2019-09/schema",
 		type: "object",
-		$merge: {
+		[isCore ? '$merge' : '$patch']: {
 			source: { $ref: isCore ? "content" : type },
 			with: {
 				required: getRequiredFields(schema),
@@ -227,9 +227,10 @@ function getItems(schema) {
 }
 
 function getIsObjectId(schema) {
-	if (schema.type !== "objectid") return;
+	const inputType = schema.inputType
+	const isAsset = (inputType?.type || inputType)?.startsWith("Asset");
 
-	return true;
+	if (isAsset || schema.type === "objectid") return true;
 }
 
 function getAdaptOptions(schema) {
