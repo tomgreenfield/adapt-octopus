@@ -39,7 +39,7 @@ function convert() {
 function iterateLocations() {
 	const locations = inputSchema.properties.pluginLocations.properties;
 
-	Object.entries(locations).forEach(([ key, value ]) => construct(key, value));
+	Object.entries(locations).forEach(location => construct(...location));
 
 	// ensure any globals are converted
 	if (!Object.keys(locations).includes("course")) construct("course", {});
@@ -59,17 +59,24 @@ function construct(type, schema = inputSchema) {
 
 	const isCore = type === inputId;
 
+	const schemaRoot = isCore && type === "config" || type === "theme" ? {
+			required: getRequiredFields(schema),
+			properties: getProperties(schema)
+		} : {
+			[isCore ? '$merge' : '$patch']: {
+				source: { $ref: isCore ? "content" : type },
+				with: {
+					required: getRequiredFields(schema),
+					properties: getProperties(schema)
+				}
+			}
+		};
+
 	outputSchema = {
 		$anchor: isCore ? type : `${inputId}-${type}`,
 		$schema: "https://json-schema.org/draft/2019-09/schema",
 		type: "object",
-		[isCore ? '$merge' : '$patch']: {
-			source: { $ref: isCore ? "content" : type },
-			with: {
-				required: getRequiredFields(schema),
-				properties: getProperties(schema)
-			}
-		}
+		...schemaRoot
 	};
   
 	write(`schema/${type}.schema.json`);
