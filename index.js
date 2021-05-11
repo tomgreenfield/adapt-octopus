@@ -74,7 +74,7 @@ function construct(type, schema = inputSchema) {
 
 	outputSchema = {
 		$anchor: isCore ? type : `${inputId}-${type}`,
-		$schema: "https://json-schema.org/draft/2019-09/schema",
+		$schema: "https://json-schema.org/draft/2020-12/schema",
 		type: "object",
 		...schemaRoot
 	};
