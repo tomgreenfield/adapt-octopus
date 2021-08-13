@@ -8,6 +8,6 @@ const octopus = new Octopus(process.argv[2], process.argv[3]);
 	try {
 		await octopus.start();
 	} catch (err) {
-		console.warn(err)
+		console.error(err);
 	}
 })();
