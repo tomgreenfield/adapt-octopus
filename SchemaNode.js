@@ -2,41 +2,44 @@ const stripObject = require("./utils/stripObject");
 
 class SchemaNode {
 
+	inputId;
+	inputSchema;
+
 	constructor(options) {
 		this.inputId = options.inputId;
 		this.inputSchema = options.inputSchema;
-		this.outputSchema = {};
+
 		switch (options.nodeType) {
 			case "root":
-				if (options.defaults) {
-					Object.assign(this.outputSchema, options.defaults);
-				}
-				const schemaRoot = options.isCore &&
-					options.schemaType === "config" ||
-					options.schemaType === "theme" ?
-						{
-							required: this.getRequiredFields(),
-							properties: this.getProperties()
-						} :
-						{
-							[options.isCore ? "$merge" : "$patch"]: {
-								source: { $ref: options.isCore ? "content" : options.schemaType },
-								with: {
-									required: this.getRequiredFields(),
-									properties: this.getProperties()
-								}
-							}
-						};
+				const type = options.schemaType;
+				const isCore = type === this.inputId;
+				const isExtension = (!isCore || type !== "config") && type !== "theme";
 
-				Object.assign(this.outputSchema, schemaRoot);
-				return;
+				let schemaInner = {
+					required: this.getRequiredFields(),
+					properties: this.getProperties()
+				};
+
+				if (isExtension) {
+					schemaInner = {
+						[isCore ? "$merge" : "$patch"]: {
+							source: { $ref: isCore ? "content" : type },
+							with: schemaInner
+						}
+					}
+				}
+
+				return {
+					$anchor: isCore ? type : `${this.inputId}-${type}`,
+					$schema: "https://json-schema.org/draft/2020-12/schema",
+					type: "object",
+					...schemaInner
+				};
 			case "properties":
-				const key = options.key;
-				const schema = this.inputSchema;
-				Object.assign(this.outputSchema, {
-					type: schema.type,
+				return {
+					type: this.inputSchema.type,
 					isObjectId: this.getIsObjectId(),
-					title: this.getTitle(key),
+					title: this.getTitle(options.key),
 					description: this.getDescription(),
 					default: this.getDefault(),
 					enum: this.getEnumeratedValues(),
@@ -46,48 +49,33 @@ class SchemaNode {
 					_adapt: this.getAdaptOptions(),
 					_backboneForms: this.getBackboneFormsOptions(),
 					_unrecognisedFields: this.getUnrecognisedFields()
-				});
-				return;
+				};
 			case "items":
-				// TODO: combine?
-				if (!this.inputSchema.properties) {
-					Object.assign(this.outputSchema, {
-						type: this.getType(), 
-						isObjectId: this.getIsObjectId() 
-					});
-					return;
-				}
-				Object.assign(this.outputSchema, {
-					type: "object", 
-					properties: this.getItemsProperties() 
-				});
-				return;
+				const properties = this.getItemsProperties();
+
+				return {
+					type: properties ? this.getType() : "object",
+					isObjectId: this.getIsObjectId(),
+					properties
+				};
 		}
 	}
 
 	getItemsProperties() {
-		const schema = this.inputSchema;
-		const originalItems = schema.properties;
+		const originalItems = this.inputSchema.properties;
 
 		if (!originalItems) return;
 
-		let itemsProperties = {};
+		return Object.entries(originalItems).reduce((a, [ key, inputSchema ]) => {
+			a[key] = new SchemaNode({ nodeType: "properties", key, inputSchema });
 
-		for (const key in originalItems) {
-			itemsProperties[key] = (new SchemaNode({
-				nodeType: "properties",
-				key,
-				inputSchema: originalItems[key]
-			})).outputSchema;
-		}
-
-		return itemsProperties;
+			return a;
+		}, {});
 	}
 
 	getProperties() {
-		const schema = this.inputSchema;
-		const originalProperties = schema.properties;
-		const originalGlobals = schema.globals;
+		const originalProperties = this.inputSchema.properties;
+		const originalGlobals = this.inputSchema.globals;
 
 		if (!originalProperties && !originalGlobals) return;
 
@@ -95,15 +83,14 @@ class SchemaNode {
 		let properties = {};
 
 		if (originalGlobals) {
-			for (const key in originalGlobals) {
-				globals[key] = (new SchemaNode({
+			for (const [ key, inputSchema ] of Object.entries(originalGlobals)) {
+				globals[key] = new SchemaNode({
 					nodeType: "properties",
 					key,
-					inputSchema: originalGlobals[key]
-				})).outputSchema;
+					inputSchema
+				});
 			}
 
-			// TODO: new node type?
 			properties._globals = {
 				type: "object",
 				default: {},
@@ -117,28 +104,28 @@ class SchemaNode {
 			};
 		}
 
-		for (const key in originalProperties) {
-			properties[key] = (new SchemaNode({
+		for (const [ key, inputSchema ] of Object.entries(originalProperties)) {
+			properties[key] = new SchemaNode({
 				nodeType: "properties",
 				key,
-				inputSchema: originalProperties[key]
-			})).outputSchema;
+				inputSchema
+			});
 		}
 
 		return properties;
 	}
 
 	getType() {
-		const schema = this.inputSchema;
-		const type = schema.type;
+		const type = this.inputSchema.type;
 
 		return type === "objectid" ? "string" : type;
 	}
 
 	getTitle(key) {
-		const schema = this.inputSchema;
-		if (schema.title) return schema.title;
-		if (schema.legend) return schema.legend;
+		const { title, legend } = this.inputSchema;
+
+		if (title) return title;
+		if (legend) return legend;
 		if (key === "pluginLocations") return;
 
 		key = key.replace(/_/g, "").replace(/[A-Z]/g, " $&").toLowerCase();
@@ -147,24 +134,20 @@ class SchemaNode {
 	}
 
 	getDescription() {
-		const schema = this.inputSchema;
+		const help = this.inputSchema.help;
 
-		if (schema.help) return schema.help;
+		if (help) return help;
 	}
 
 	getDefault() {
 		if (this.getIsObjectId()) return;
 
-		const schema = this.inputSchema;
-		const hasDefault = schema.default !== undefined;
+		const originalDefault = this.inputSchema.default;
 
-		if (hasDefault) return schema.default;
+		if (originalDefault !== undefined) return originalDefault;
+		if (this.inputSchema.validators?.includes("required")) return;
 
-		const isRequired = schema.validators && schema.validators.includes("required");
-	
-		if (!hasDefault && isRequired) return;
-
-		switch (schema.type) {
+		switch (this.inputSchema.type) {
 			case "string":
 				return "";
 			case "number":
@@ -172,7 +155,7 @@ class SchemaNode {
 			case "object":
 				return {};
 			case "array":
-				if (!schema.items) return [];
+				if (!this.inputSchema.items) return [];
 				break;
 			case "boolean":
 				return false;
@@ -180,27 +163,25 @@ class SchemaNode {
 	}
 
 	getEnumeratedValues() {
-		const schema = this.inputSchema;
-		if (schema.enum) return schema.enum;
+		const originalEnum = this.inputSchema.originalEnum;
 
-		const inputType = schema.inputType;
+		if (originalEnum) return originalEnum;
 
-		if (inputType && inputType.type === "Select") return inputType.options;
+		const inputType = this.inputSchema.inputType;
+
+		if (inputType?.type === "Select") return inputType.options;
 	}
 
 	getRequiredFields() {
-		const schema = this.inputSchema;
-		const properties = schema.properties;
+		const properties = this.inputSchema.properties;
 
 		if (!properties) return;
 
-		let requiredFields = [];
+		const requiredFields = Object.entries(properties).reduce((a, [ key, value ]) => {
+			if (value.validators?.includes("required")) a.push(key);
 
-		for (const key in properties) {
-			const validators = properties[key].validators;
-
-			if (validators && validators.includes("required")) requiredFields.push(key);
-		}
+			return a;
+		}, []);
 
 		if (!requiredFields.length) return;
 
@@ -208,39 +189,31 @@ class SchemaNode {
 	}
 
 	getItems() {
-		const schema = this.inputSchema;
-		const items = schema.items;
+		const items = this.inputSchema.items;
 
-		if (!items) return;
-
-		return new SchemaNode({
-			nodeType: "items",
-			inputSchema: items
-		}).outputSchema;
+		if (items) return new SchemaNode({ nodeType: "items",  inputSchema: items });
 	}
 
 	getIsObjectId() {
-		const schema = this.inputSchema;
-		const inputType = schema.inputType;
+		const inputType = this.inputSchema.inputType;
 		const isAsset = (inputType?.type || inputType)?.startsWith("Asset");
 
-		if (isAsset || schema.type === "objectid") return true;
+		if (isAsset || this.inputSchema.type === "objectid") return true;
 	}
 
 	getAdaptOptions() {
-		const schema = this.inputSchema;
 		return stripObject({
-			editorOnly: schema.editorOnly,
-			isSetting: schema.isSetting,
-			translatable: schema.translatable
+			editorOnly: this.inputSchema.editorOnly,
+			isSetting: this.inputSchema.isSetting,
+			translatable: this.inputSchema.translatable
 		});
 	}
 
 	getBackboneFormsOptions() {
-		const schema = this.inputSchema;
+		const inputType = this.inputSchema.inputType;
 
 		const getEditor = () => {
-			const type = schema.type;
+			const type = this.inputSchema.type;
 
 			const recognisedTypes = [
 				"string",
@@ -251,9 +224,11 @@ class SchemaNode {
 				"objectid"
 			];
 
-			const editor = options.type || schema.inputType;
+			const editor = options.type || inputType;
 
-			if (!recognisedTypes.includes(type)) console.log(`Unrecognised type => ${type}`);
+			if (!recognisedTypes.includes(type)) {
+				console.log(`Unrecognised type => ${type}`);
+			}
 
 			if (editor === "QuestionButton" ||
 				type === "string" && editor === "Text" ||
@@ -266,12 +241,12 @@ class SchemaNode {
 		};
 
 		const getValidators = () => {
-			let validators = schema.validators;
+			let validators = this.inputSchema.validators;
 
 			if (!validators) return;
 
-			validators = schema.validators.filter(validator => {
-				return validator === "number" ? schema.inputType !== "Number" :
+			validators = this.inputSchema.validators.filter(validator => {
+				return validator === "number" ? inputType !== "Number" :
 					validator !== "required";
 			});
 
@@ -280,22 +255,22 @@ class SchemaNode {
 			return validators;
 		};
 
-		let options = typeof schema.inputType === "object" ? schema.inputType : {};
+		let options = typeof inputType === "object" ? inputType : {};
 
 		Object.assign(options, {
 			type: getEditor(),
-			titleHTML: schema.titleHTML,
+			titleHTML: this.inputSchema.titleHTML,
 			validators: getValidators(),
-			editorClass: schema.editorClass,
-			editorAttrs: schema.editorAttrs,
-			fieldClass: schema.fieldClass,
-			fieldAttrs: schema.fieldAttrs,
-			confirmDelete: schema.confirmDelete
+			editorClass: this.inputSchema.editorClass,
+			editorAttrs: this.inputSchema.editorAttrs,
+			fieldClass: this.inputSchema.fieldClass,
+			fieldAttrs: this.inputSchema.fieldAttrs,
+			confirmDelete: this.inputSchema.confirmDelete
 		});
 
-		let splitTypes = options.type && options.type.split(":");
+		const splitTypes = options.type?.split(":");
 
-		switch (splitTypes && splitTypes.length > 1 && splitTypes[0]) {
+		switch (splitTypes?.length > 1 && splitTypes[0]) {
 			case "Asset":
 				options.type = { type: "Asset", media: splitTypes[1] };
 				break;
@@ -311,7 +286,6 @@ class SchemaNode {
 	}
 
 	getUnrecognisedFields() {
-		const schema = this.inputSchema;
 		const recognisedKeys = [
 			"confirmDelete",
 			"default",
@@ -338,12 +312,12 @@ class SchemaNode {
 
 		let unrecognisedFields = {};
 
-		Object.keys(schema).forEach(key => {
-			if (recognisedKeys.includes(key)) return;
+		for (const [ key, value ] of Object.entries(this.inputSchema)) {
+			if (recognisedKeys.includes(key)) continue;
 
-			console.log(`Unrecognised field => "${key}": ${JSON.stringify(schema[key])}`);
-			unrecognisedFields[key] = schema[key];
-		});
+			console.log(`Unrecognised field => "${key}": ${JSON.stringify(value)}`);
+			unrecognisedFields[key] = value;
+		}
 
 		return stripObject(unrecognisedFields);
 	}
