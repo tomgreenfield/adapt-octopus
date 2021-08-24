@@ -1,8 +1,9 @@
 {
   "name": "adapt-octopus",
-  "version": "0.0.13",
+  "version": "0.1.0",
   "description": "Convert old Adapt schema into conformant JSON schema",
-  "main": "index.js",
+  "type": "module",
+  "main": "./lib/Octopus.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/tomgreenfield/adapt-octopus.git"
@@ -12,5 +13,5 @@
     "url": "https://github.com/tomgreenfield/adapt-octopus/issues"
   },
   "homepage": "https://github.com/tomgreenfield/adapt-octopus#readme",
-  "bin": "./bin/octopus"
+  "bin": "./bin/cli.js"
 }
