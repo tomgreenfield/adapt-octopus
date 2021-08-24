@@ -1,9 +1,9 @@
-const fs = require("fs/promises");
-const os = require("os");
-const path = require("path");
-const SchemaNode = require("./SchemaNode");
+import { EOL } from "os";
+import fs from "fs/promises";
+import path from "path";
+import SchemaNode from "./SchemaNode.js";
 
-class Octopus {
+export default class Octopus {
 
 	inputPath;
 	outputPath;
@@ -78,7 +78,7 @@ class Octopus {
 	}
 
 	async write() {
-		const json = JSON.stringify(this.outputSchema, null, 2) + os.EOL;
+		const json = JSON.stringify(this.outputSchema, null, 2) + EOL;
 
 		await fs.mkdir(path.dirname(this.outputPath), { recursive: true });
 		await fs.writeFile(this.outputPath, json);
@@ -86,5 +86,3 @@ class Octopus {
 	}
 
 }
-
-module.exports = Octopus;
