@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import Octopus from "../index.js";
+import Octopus from "../lib/Octopus.js";
 
 const octopus = new Octopus({ inputPath: process.argv[2], inputId: process.argv[3] });
 
